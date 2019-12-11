@@ -50,7 +50,7 @@ public class ManyToOneRoadCalculation {
 	}
 
 	public static void main(String[] args) throws IOException, InterruptedException {
-		File fl = new File("/home/victor/projects/osmand/osm-gen/Netherlands_europe_2.obf");
+		File fl = new File("/home/victorshcherb/osmand/maps/Russia_crimea_asia_2.obf");
 		RandomAccessFile raf = new RandomAccessFile(fl, "r"); //$NON-NLS-1$ //$NON-NLS-2$
 		BinaryMapIndexReader reader = new BinaryMapIndexReader(raf, fl);
 		int zoom = 9;

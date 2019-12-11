@@ -19,12 +19,15 @@ import java.io.StringReader;
 import java.lang.reflect.InvocationTargetException;
 import java.net.URL;
 import java.net.URLConnection;
-import java.text.ParseException;
-import java.text.SimpleDateFormat;
+import java.sql.CallableStatement;
+import java.sql.Connection;
+import java.sql.PreparedStatement;
+import java.sql.ResultSet;
+import java.sql.SQLException;
+import java.sql.Statement;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
-import java.util.Locale;
 import java.util.Map;
 
 import javax.swing.AbstractAction;
@@ -54,11 +57,13 @@ import net.osmand.PlatformUtil;
 import net.osmand.binary.BinaryMapIndexReader;
 import net.osmand.data.DataTileManager;
 import net.osmand.data.LatLon;
+import net.osmand.obf.preparation.DBDialect;
 import net.osmand.osm.edit.Entity;
 import net.osmand.osm.edit.OSMSettings.OSMTagKey;
 import net.osmand.osm.edit.OsmMapUtils;
 import net.osmand.osm.edit.Way;
 import net.osmand.router.BinaryRoutePlanner.RouteSegment;
+import net.osmand.router.BinaryRoutePlanner.RouteSegmentEstimate;
 import net.osmand.router.BinaryRoutePlanner.RouteSegmentVisitor;
 import net.osmand.router.PrecalculatedRouteDirection;
 import net.osmand.router.RoutePlannerFrontEnd;
@@ -74,6 +79,9 @@ import net.osmand.util.MapUtils;
 public class MapRouterLayer implements MapPanelLayer {
 
 	private final static Log log = PlatformUtil.getLog(MapRouterLayer.class);
+
+	private static final boolean BUILD_SEGMENT_MAP = true;
+	private static final boolean CALC_ROUTE_USING_MAP = true;
 
 	private MapPanel map;
 	private LatLon startRoute ;
@@ -731,15 +739,28 @@ public class MapRouterLayer implements MapPanelLayer {
 				log.info("Use " + config.routerName + "mode for routing");
 				final DataTileManager<Entity> points = new DataTileManager<Entity>(11);
 				map.setPoints(points);
-				ctx.setVisitor(createSegmentVisitor(animateRoutingCalculation, points));
+				RouteSegmentPanelVisitor visitor = new RouteSegmentPanelVisitor(animateRoutingCalculation, points);
+				RouteSegmentEstimator estimator = new RouteSegmentEstimator();
+				
+				File f = new File(DataExtractionSettings.getSettings().getBinaryFilesDir(), "route.sqlite");
+				if(CALC_ROUTE_USING_MAP) {
+					Connection c = DBDialect.SQLITE.getDatabaseConnection(f.getAbsolutePath(), log);
+					estimator.setSqliteConn(c);
+					ctx.setEstimate(estimator);
+				} else if(BUILD_SEGMENT_MAP) {
+					Connection c = DBDialect.SQLITE.getDatabaseConnection(f.getAbsolutePath(), log);
+					visitor.setSqliteConn(c);
+				}
+				ctx.setVisitor(visitor);
 				// Choose native or not native
 				long nt = System.nanoTime();
 				startProgressThread(ctx);
 				try {
 					List<RouteSegmentResult> searchRoute = router.searchRoute(ctx, start, end,
 							intermediates, precalculatedRouteDirection);
+					visitor.finish();
+					estimator.finish();
 					throwExceptionIfRouteNotFound(ctx, searchRoute);
-
 
 					System.out.println("External native time " + (System.nanoTime() - nt) / 1.0e9f);
 					if (animateRoutingCalculation) {
@@ -798,7 +819,7 @@ public class MapRouterLayer implements MapPanelLayer {
 //								all *= 1.2;
 //							}
 					if(all > 0 ) {
-						int  t = (int) (p*p/(all*all)* 100.0f);
+						int t = (int) (p*p/(all*all)* 100.0f);
 //								int  t = (int) (p/all*100f);
 //						System.out.println("Progress " + t + " % " +
 //								ctx.calculationProgress.distanceFromBegin + " " + ctx.calculationProgress.distanceFromEnd+" " + all);
@@ -854,74 +875,179 @@ public class MapRouterLayer implements MapPanelLayer {
 
 		}
 	}
+	
+	public class RouteSegmentEstimator implements RouteSegmentEstimate {
 
-	private RouteSegmentVisitor createSegmentVisitor(final boolean animateRoutingCalculation, final DataTileManager<Entity> points) {
-		return new RouteSegmentVisitor() {
+		private Connection conn;
+		private PreparedStatement pc;
 
-			private List<RouteSegment> cache = new ArrayList<RouteSegment>();
-			private List<RouteSegment> pollCache = new ArrayList<RouteSegment>();
-			private List<Integer> cacheInt = new ArrayList<Integer>();
-
-			@Override
-			public void visitSegment(RouteSegment s, int  endSegment, boolean poll) {
-				if(stop) {
-					throw new RuntimeException("Interrupted");
-				}
-				if (!animateRoutingCalculation) {
-					return;
-				}
-				if (!poll && pause) {
-					pollCache.add(s);
-					return;
-				}
-
-				cache.add(s);
-				cacheInt.add(endSegment);
-				if (cache.size() < steps) {
-					return;
-				}
-				if(pause) {
-					registerObjects(points, poll, pollCache, null);
-					pollCache.clear();
-				}
-				registerObjects(points, !poll, cache, cacheInt);
-				cache.clear();
-				cacheInt.clear();
-				redraw();
-				if (pause) {
-					waitNextPress();
+		public void setSqliteConn(Connection c) {
+			this.conn = c;
+			try {
+				pc = conn.prepareStatement("SELECT min(distance), max(distance) FROM roads where rid = ?");
+			} catch (SQLException e) {
+				throw new RuntimeException(e);
+			}
+		}
+		
+		public void finish() {
+			if (conn != null) {
+				try {
+					pc.close();
+					conn.close();
+				} catch (SQLException e) {
+					throw new RuntimeException(e);
 				}
 			}
-
-			private void registerObjects(final DataTileManager<Entity> points, boolean white, List<RouteSegment> registerCache,
-					List<Integer> cacheInt) {
-				for (int l = 0; l < registerCache.size(); l++) {
-					RouteSegment segment = registerCache.get(l);
-					Way way = new Way(-1);
-					way.putTag(OSMTagKey.NAME.getValue(), segment.getTestName());
-					if (white) {
-						way.putTag("color", "white");
-					}
-					int from = cacheInt != null ? segment.getSegmentStart() : segment.getSegmentStart() - 2;
-					int to = cacheInt != null ? cacheInt.get(l) : segment.getSegmentStart() + 2;
-					if(from > to) {
-						int x = from;
-						from = to;
-						to = x;
-					}
-					for (int i = from; i <= to; i++) {
-						if (i >= 0 && i < segment.getRoad().getPointsLength()) {
-							net.osmand.osm.edit.Node n = createNode(segment, i);
-							way.addNode(n);
-						}
-					}
-					LatLon n = way.getLatLon();
-					points.registerObject(n.getLatitude(), n.getLongitude(), way);
-				}
+		}
+		
+		@Override
+		public float timeEstimate(RouteSegment segment, short segmentPoint, RouteSegment target) {
+			double es = getEstimate(segment, true);
+			double ts = getEstimate(segment, false);
+			if(es != 0 && ts != 0) {
+				return (float) (es - ts);
 			}
+			return 0;
+		}
 
-		};
+		private double getEstimate(RouteSegment segment, boolean min) {
+			try {
+				pc.setLong(1, segment.getRoad().getId());
+				ResultSet qs = pc.executeQuery();
+				if(qs != null && qs.next()) {
+					return qs.getDouble(min ? 1 : 2);
+				}
+				return 0;
+			} catch (SQLException e) {
+				throw new RuntimeException(e);
+			}
+		}
+		
 	}
+	
+	public class RouteSegmentPanelVisitor implements RouteSegmentVisitor {
+
+		private List<RouteSegment> cache = new ArrayList<RouteSegment>();
+		private List<RouteSegment> pollCache = new ArrayList<RouteSegment>();
+		private List<Integer> cacheInt = new ArrayList<Integer>();
+		final boolean animateRoutingCalculation;
+		final DataTileManager<Entity> points;
+		private Connection conn;
+		private PreparedStatement pc;
+		private int bc = 0;
+		private static final int BATCH_SIZE = 1000;
+		
+		public RouteSegmentPanelVisitor(boolean animateRoutingCalculation, DataTileManager<Entity> points) {
+			this.animateRoutingCalculation = animateRoutingCalculation;
+			this.points = points;
+		}
+		
+		public void setSqliteConn(Connection c) {
+			this.conn = c;
+			try {
+				Statement s = conn.createStatement();
+				s.execute("DROP TABLE IF EXISTS roads ");
+				s.execute("CREATE TABLE roads(rid bigint, distance double, segment int)");
+				s.close();
+				pc = conn.prepareStatement("INSERT INTO roads(rid, distance, segment) values (?, ?, ?)");
+			} catch (SQLException e) {
+				throw new RuntimeException(e);
+			}
+		}
+		
+		
+		@Override
+		public void visitSegmentPart(boolean reverseWaySearch, RouteSegment segment, short segmentPoint,
+				float distStartObstacles, long routePointId) {
+			if (pc != null) {
+				try {
+					pc.setLong(1, segment.getRoad().getId());
+					pc.setDouble(2, distStartObstacles);
+					pc.setInt(3, segmentPoint);
+					pc.addBatch();
+					if(bc++ >= BATCH_SIZE) {
+						pc.executeBatch();
+						bc = 0;
+					}
+				} catch (SQLException e) {
+					throw new RuntimeException(e);
+				}
+			}
+		}
+
+		public void finish() {
+			if (conn != null) {
+				try {
+					pc.executeBatch();
+					Statement s = conn.createStatement();
+					s.execute("CREATE INDEX roads_rid on roads(rid)");
+					s.close();
+					pc.close();
+					conn.close();
+				} catch (SQLException e) {
+					throw new RuntimeException(e);
+				}
+			}
+		}
+
+		@Override
+		public void visitSegment(boolean reverseWaySearch, RouteSegment s, int segmentEnd) {
+			if(stop) {
+				throw new RuntimeException("Interrupted");
+			}
+			if (!animateRoutingCalculation) {
+				return;
+			}
+			cache.add(s);
+			cacheInt.add(segmentEnd);
+			if (cache.size() < steps) {
+				return;
+			}
+			if(pause) {
+				registerObjects(points, true, pollCache, null);
+				pollCache.clear();
+			}
+			registerObjects(points, !false, cache, cacheInt);
+			cache.clear();
+			cacheInt.clear();
+			redraw();
+			if (pause) {
+				waitNextPress();
+			}
+		}
+
+		private void registerObjects(final DataTileManager<Entity> points, boolean white, List<RouteSegment> registerCache,
+				List<Integer> cacheInt) {
+			for (int l = 0; l < registerCache.size(); l++) {
+				RouteSegment segment = registerCache.get(l);
+				Way way = new Way(-1);
+				way.putTag(OSMTagKey.NAME.getValue(), segment.getTestName());
+				if (white) {
+					way.putTag("color", "white");
+				}
+				int from = cacheInt != null ? segment.getSegmentStart() : segment.getSegmentStart() - 2;
+				int to = cacheInt != null ? cacheInt.get(l) : segment.getSegmentStart() + 2;
+				if(from > to) {
+					int x = from;
+					from = to;
+					to = x;
+				}
+				for (int i = from; i <= to; i++) {
+					if (i >= 0 && i < segment.getRoad().getPointsLength()) {
+						net.osmand.osm.edit.Node n = createNode(segment, i);
+						way.addNode(n);
+					}
+				}
+				LatLon n = way.getLatLon();
+				points.registerObject(n.getLatitude(), n.getLongitude(), way);
+			}
+		}
+
+		
+
+	}
+
 
 	private net.osmand.osm.edit.Node createNode(RouteSegment segment, int i) {
 		net.osmand.osm.edit.Node n = new net.osmand.osm.edit.Node(MapUtils.get31LatitudeY(segment.getRoad().getPoint31YTile(i)),

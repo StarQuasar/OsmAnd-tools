@@ -150,6 +150,7 @@ public class IndexRouteCreator extends AbstractIndexPartCreator {
 		this.settings = settings;
 		this.routeTypes = new MapRoutingTypes(renderingTypes);
 	}
+	
 	public void indexRelations(Entity e, OsmDbAccessorContext ctx) throws SQLException {
 		indexHighwayRestrictions(e, ctx);
 		if(e instanceof Relation) {

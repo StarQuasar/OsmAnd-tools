@@ -162,7 +162,7 @@ public class MapClusterLayer implements MapPanelLayer {
 			private List<RouteSegment> cache = new ArrayList<RouteSegment>();
 
 			@Override
-			public void visitSegment(RouteSegment s, int endSegment, boolean poll) {
+			public void visitSegment(boolean reverseWaySearch, RouteSegment s, int segmentEnd) {
 				if(!clusterCtx.ANIMATE_CLUSTERING){
 					return;
 				}
@@ -194,6 +194,12 @@ public class MapClusterLayer implements MapPanelLayer {
 				} catch (InvocationTargetException e) {
 					e.printStackTrace();
 				}
+			}
+
+			@Override
+			public void visitSegmentPart(boolean reverseWaySearch, RouteSegment segment, short segmentPoint,
+					float distStartObstacles, long routePointId) {
+				
 			}
 
 		});
@@ -244,7 +250,7 @@ public class MapClusterLayer implements MapPanelLayer {
 			visitedIds.add(calculateId(segment));
 			// Visualization of steps !
 			if (ctx.getVisitor() != null) {
-				ctx.getVisitor().visitSegment(segment, -1, true);
+				ctx.getVisitor().visitSegment(false, segment, -1);
 			}
 			cCtx.roadProcessed++;
 			if (cCtx.roadProcessed > 50) {
