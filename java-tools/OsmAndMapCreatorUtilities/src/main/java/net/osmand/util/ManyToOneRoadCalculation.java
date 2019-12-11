@@ -63,7 +63,7 @@ public class ManyToOneRoadCalculation {
 
 	private void manyToManyCalculation(BinaryMapIndexReader reader, double top, double bottom) throws IOException {
 		RoutePlannerFrontEnd frontEnd = new RoutePlannerFrontEnd();
-		RoutingConfiguration config = RoutingConfiguration.getDefault().build("car", 1000);
+		RoutingConfiguration config = RoutingConfiguration.getDefault().build("car", RoutingConfiguration.DEFAULT_MEMORY_LIMIT_PC);
 		RouteCalculationMode mode = RouteCalculationMode.BASE;
 		RoutingContext ctx = frontEnd.buildRoutingContext(config, null, new BinaryMapIndexReader[] {reader}, mode);
 
@@ -417,7 +417,7 @@ public class ManyToOneRoadCalculation {
 
 	private void cut(BinaryMapIndexReader reader) throws IOException {
 		RoutePlannerFrontEnd frontEnd = new RoutePlannerFrontEnd();
-		RoutingConfiguration config = RoutingConfiguration.getDefault().build("car", 1000);
+		RoutingConfiguration config = RoutingConfiguration.getDefault().build("car", RoutingConfiguration.DEFAULT_MEMORY_LIMIT_PC);
 		RouteCalculationMode mode = RouteCalculationMode.BASE;
 		RoutingContext ctx = frontEnd.buildRoutingContext(config, null, new BinaryMapIndexReader[] {reader}, mode);
 

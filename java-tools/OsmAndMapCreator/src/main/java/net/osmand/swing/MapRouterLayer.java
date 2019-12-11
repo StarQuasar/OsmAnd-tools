@@ -19,7 +19,6 @@ import java.io.StringReader;
 import java.lang.reflect.InvocationTargetException;
 import java.net.URL;
 import java.net.URLConnection;
-import java.sql.CallableStatement;
 import java.sql.Connection;
 import java.sql.PreparedStatement;
 import java.sql.ResultSet;
@@ -708,7 +707,7 @@ public class MapRouterLayer implements MapPanelLayer {
 					}
 				}
 				RoutingConfiguration config = DataExtractionSettings.getSettings().getRoutingConfig().build(props[0],
-						/*RoutingConfiguration.DEFAULT_MEMORY_LIMIT*/ 1000, paramsR);
+						RoutingConfiguration.DEFAULT_MEMORY_LIMIT_PC, paramsR);
 				PrecalculatedRouteDirection precalculatedRouteDirection = null;
 				// Test gpx precalculation
 //				LatLon[] lts = parseGPXDocument("/home/victor/projects/osmand/temp/esya.gpx");
@@ -736,7 +735,7 @@ public class MapRouterLayer implements MapPanelLayer {
 				
 				ctx.leftSideNavigation = false;
 				ctx.previouslyCalculatedRoute = previousRoute;
-				log.info("Use " + config.routerName + "mode for routing");
+				log.info("Use " + config.routerName + " mode for routing");
 				final DataTileManager<Entity> points = new DataTileManager<Entity>(11);
 				map.setPoints(points);
 				RouteSegmentPanelVisitor visitor = new RouteSegmentPanelVisitor(animateRoutingCalculation, points);
@@ -744,10 +743,13 @@ public class MapRouterLayer implements MapPanelLayer {
 				
 				File f = new File(DataExtractionSettings.getSettings().getBinaryFilesDir(), "route.sqlite");
 				if(CALC_ROUTE_USING_MAP) {
+					ctx.config.planRoadDirection = 1;
 					Connection c = DBDialect.SQLITE.getDatabaseConnection(f.getAbsolutePath(), log);
 					estimator.setSqliteConn(c);
 					ctx.setEstimate(estimator);
-				} else if(BUILD_SEGMENT_MAP) {
+				} else if(BUILD_SEGMENT_MAP && false) {
+					ctx.config.planRoadDirection = -1;
+					ctx.neverEndingRoute = true;
 					Connection c = DBDialect.SQLITE.getDatabaseConnection(f.getAbsolutePath(), log);
 					visitor.setSqliteConn(c);
 				}
@@ -758,8 +760,6 @@ public class MapRouterLayer implements MapPanelLayer {
 				try {
 					List<RouteSegmentResult> searchRoute = router.searchRoute(ctx, start, end,
 							intermediates, precalculatedRouteDirection);
-					visitor.finish();
-					estimator.finish();
 					throwExceptionIfRouteNotFound(ctx, searchRoute);
 
 					System.out.println("External native time " + (System.nanoTime() - nt) / 1.0e9f);
@@ -772,6 +772,8 @@ public class MapRouterLayer implements MapPanelLayer {
 					this.previousRoute = searchRoute;
 					calculateResult(res, searchRoute);
 				} finally {
+					visitor.finish();
+					estimator.finish();
 					ctx.calculationProgress.isCancelled = true;
 				}
 			} catch (Exception e) {
@@ -881,6 +883,8 @@ public class MapRouterLayer implements MapPanelLayer {
 		private Connection conn;
 		private PreparedStatement pc;
 
+		private long targetId;
+		private double ts;
 		public void setSqliteConn(Connection c) {
 			this.conn = c;
 			try {
@@ -904,7 +908,11 @@ public class MapRouterLayer implements MapPanelLayer {
 		@Override
 		public float timeEstimate(RouteSegment segment, short segmentPoint, RouteSegment target) {
 			double es = getEstimate(segment, true);
-			double ts = getEstimate(segment, false);
+			if(target.getRoad().getId() != targetId) {
+				this.ts = getEstimate(target, false);
+				this.targetId = target.getRoad().getId();
+			}
+			double ts = this.ts;
 			if(es != 0 && ts != 0) {
 				return (float) (es - ts);
 			}
@@ -960,7 +968,7 @@ public class MapRouterLayer implements MapPanelLayer {
 		@Override
 		public void visitSegmentPart(boolean reverseWaySearch, RouteSegment segment, short segmentPoint,
 				float distStartObstacles, long routePointId) {
-			if (pc != null) {
+			if (pc != null && reverseWaySearch) {
 				try {
 					pc.setLong(1, segment.getRoad().getId());
 					pc.setDouble(2, distStartObstacles);

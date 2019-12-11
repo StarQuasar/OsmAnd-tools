@@ -51,7 +51,7 @@ public class ImproveRoadConnectivity {
 			throws IOException {
 		RoutePlannerFrontEnd router = new RoutePlannerFrontEnd();
 		Builder builder = RoutingConfiguration.getDefault();
-		RoutingConfiguration config = builder.build("car", RoutingConfiguration.DEFAULT_MEMORY_LIMIT * 3);
+		RoutingConfiguration config = builder.build("car", RoutingConfiguration.DEFAULT_MEMORY_LIMIT_PC);
 		RoutingContext ctx = router.buildRoutingContext(config, null, new BinaryMapIndexReader[] { reader },
 				RouteCalculationMode.BASE);
 		if (reader.getRoutingIndexes().size() != 1) {
@@ -87,7 +87,7 @@ public class ImproveRoadConnectivity {
 			throws IOException {
 		RoutePlannerFrontEnd router = new RoutePlannerFrontEnd();
 		Builder builder = RoutingConfiguration.getDefault();
-		RoutingConfiguration config = builder.build("car", RoutingConfiguration.DEFAULT_MEMORY_LIMIT * 3);
+		RoutingConfiguration config = builder.build("car", RoutingConfiguration.DEFAULT_MEMORY_LIMIT_PC);
 		RoutingContext ctx = router.buildRoutingContext(config, null, new BinaryMapIndexReader[] { reader },
 				RouteCalculationMode.BASE);
 		if (reader.getRoutingIndexes().size() != 1) {
@@ -139,7 +139,7 @@ public class ImproveRoadConnectivity {
 	private TLongObjectHashMap<RouteDataObject> calculateDisconnectedRoadsToAddAndDelete(TLongObjectHashMap<List<RouteDataObject>> mapOfObjectToCheck,
 			TLongObjectHashMap<List<RouteDataObject>> all, BinaryMapIndexReader reader, TLongHashSet setToRemove, TLongHashSet registeredIds) {
 		RoutePlannerFrontEnd frontEnd = new RoutePlannerFrontEnd();
-		RoutingConfiguration config = RoutingConfiguration.getDefault().build("car", 1000);
+		RoutingConfiguration config = RoutingConfiguration.getDefault().build("car", RoutingConfiguration.DEFAULT_MEMORY_LIMIT_PC);
 
 		long[] keys = mapOfObjectToCheck.keys();
 		TLongObjectHashMap<RouteDataObject> toAdd = new TLongObjectHashMap<RouteDataObject>();

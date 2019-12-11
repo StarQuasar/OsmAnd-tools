@@ -174,7 +174,7 @@ public class MapAddressLayer implements MapPanelLayer {
 				}
 			}
 		}
-		RoutingConfiguration cfg = DataExtractionSettings.getSettings().getRoutingConfig().build("geocoding", 100,
+		RoutingConfiguration cfg = DataExtractionSettings.getSettings().getRoutingConfig().build("geocoding", RoutingConfiguration.DEFAULT_MEMORY_LIMIT_PC,
 				new HashMap<String, String>());
 		RoutingContext ctx = new RoutePlannerFrontEnd().buildRoutingContext(cfg, null, list.toArray(new BinaryMapIndexReader[list.size()]));
 
