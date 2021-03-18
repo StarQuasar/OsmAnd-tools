@@ -516,8 +516,16 @@ public class IndexAddressCreator extends AbstractIndexPartCreator {
 
 
 	private void printBuilding(String streetName, Building building) {
-		System.out.println(String.format("%s %s (%d) - %d %d", streetName, building.getName(), building.getId() >> 6, (int) MapUtils.getTileNumberX(24, building.getLocation().getLongitude()),
-				(int) MapUtils.getTileNumberY(24, building.getLocation().getLatitude())));
+		int x = (int) MapUtils.getTileNumberX(24, building.getLocation().getLongitude());
+		int y = (int) MapUtils.getTileNumberY(24, building.getLocation().getLatitude());
+		String url = String.format("https://www.openstreetmap.org/?mlat=%.7f&mlon=%.7f#map=19/%.7f/%.7f",
+				MapUtils.getLatitudeFromTile(24, y), MapUtils.getLongitudeFromTile(24, x),
+				MapUtils.getLatitudeFromTile(24, y), MapUtils.getLongitudeFromTile(24, x));
+		String urlPrecise = String.format("https://www.openstreetmap.org/?mlat=%.7f&mlon=%.7f#map=19/%.7f/%.7f", 
+				building.getLocation().getLatitude(), building.getLocation().getLongitude(),
+				building.getLocation().getLatitude(), building.getLocation().getLongitude());
+		System.out.println(String.format("%s %s (%d) - %d %d (24url - %s, precise url %s)", streetName, building.getName(), building.getId() >> 6, x, y,
+					url, urlPrecise));
 	}
 
 
