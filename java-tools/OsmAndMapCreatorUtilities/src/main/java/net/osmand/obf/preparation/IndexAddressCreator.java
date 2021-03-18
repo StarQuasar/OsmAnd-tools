@@ -499,6 +499,7 @@ public class IndexAddressCreator extends AbstractIndexPartCreator {
 							if (building.getLocation() == null) {
 								log.warn("building with empty location! id: " + house.getId());
 							} else {
+								printBuilding(streetName, building);
 								building.setName(hname);
 								if(Algorithms.isEmpty(building.getPostcode())) {
 									building.setPostcode(postcode);
@@ -510,6 +511,13 @@ public class IndexAddressCreator extends AbstractIndexPartCreator {
 				}
 			}
 		}
+	}
+
+
+
+	private void printBuilding(String streetName, Building building) {
+		System.out.println(String.format("%s %s (%d) - %d %d", streetName, building.getName(), building.getId() >> 6, (int) MapUtils.getTileNumberX(24, building.getLocation().getLongitude()),
+				(int) MapUtils.getTileNumberY(24, building.getLocation().getLatitude())));
 	}
 
 
@@ -810,6 +818,7 @@ public class IndexAddressCreator extends AbstractIndexPartCreator {
 							building.setName(first.getTag(OSMTagKey.ADDR_HOUSE_NUMBER));
 							building.setName2(second.getTag(OSMTagKey.ADDR_HOUSE_NUMBER));
 							building.setLatLon2(second.getLatLon());
+							printBuilding(strt, building);
 							streetDAO.writeBuilding(idsOfStreet, building);
 						}
 					}
@@ -895,11 +904,13 @@ public class IndexAddressCreator extends AbstractIndexPartCreator {
 							Set<Long> ids2OfStreet = getStreetInCity(e.getIsInNames(), street2, null, l);
 							ids2OfStreet.removeAll(idsOfStreet); // remove duplicated entries!
 							if (!ids2OfStreet.isEmpty()) {
+								printBuilding(street, building);
 								streetDAO.writeBuilding(ids2OfStreet, building2);
 								building.setName(firstNo);
 							}
 						}
 					} 
+					printBuilding(street, building);
 					streetDAO.writeBuilding(idsOfStreet, building);
 				}
 			}
