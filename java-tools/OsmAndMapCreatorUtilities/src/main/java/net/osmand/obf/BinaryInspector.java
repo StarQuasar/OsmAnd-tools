@@ -82,16 +82,16 @@ public class BinaryInspector {
 //					"-vpoi",
 //					"-vmap", "-vmapobjects",
 //					"-vmapcoordinates",
-					"-vrouting",
+//					"-vrouting",
 //					"-vtransport", "-vtransportschedule",
-//					"-vaddress", "-vcities","-vstreetgroups",
-//					"-vstreets", "-vbuildings", "-vintersections",
+					"-vaddress", "-vcities","-vstreetgroups",
+					"-vstreets", "-vbuildings", "-vintersections",
 //					"-lang=ru",
 //					"-zoom=6",
 					// road
-//					"-latlon=48.8416,17.4115",
-					System.getProperty("maps.dir")+"/21_03_05_17_05.obf"
-//					"-osm="+System.getProperty("maps.dir")+"/map.obf.osm",
+//					"-latlon=49.23018545,28.51034085",
+//					"-osm="+System.getProperty("maps.dir")+"map_base.obf.osm",
+					System.getProperty("maps.dir")+"/Map.obf"
 //					System.getProperty("maps.dir")+"/../repos/resources/countries-info/regions.ocbf"
 			});
 		} else {
@@ -781,8 +781,9 @@ public class BinaryInspector {
 					if (buildings != null && !buildings.isEmpty() && verbose.vbuildings) {
 						println("\t\t\t\tBuildings:");
 						for (Building b : buildings) {
-							println("\t\t\t\t" + b.getName(verbose.lang)
-									+ (b.getPostcode() == null ? "" : " postcode:" + b.getPostcode()));
+							println(String.format("\t\t\t\t%s %s %d %d ", b.getName(verbose.lang),
+									b.getPostcode() == null ? "" : " postcode:" + b.getPostcode(),  (int) MapUtils.getTileNumberX(24, b.getLocation().getLongitude()),
+									(int) MapUtils.getTileNumberY(24, b.getLocation().getLatitude())));
 						}
 					}
 
